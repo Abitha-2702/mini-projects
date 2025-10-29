@@ -1,0 +1,277 @@
+import java.io.Console;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
+
+class User {
+    private String name;
+    private String hashedPwd;
+    private int balance;
+    private List<Integer> deposits;
+    private List<Integer> withdrawals;
+    private int loginAttempts;
+    private boolean locked;
+
+    public User(String name, String pwd) {
+        this.name = name;
+        this.hashedPwd = hashPassword(pwd);
+        this.balance = 0;
+        this.deposits = new ArrayList<>();
+        this.withdrawals = new ArrayList<>();
+        this.loginAttempts = 0;
+        this.locked = false;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public boolean isLocked() {
+        return locked;
+    }
+
+    public void lockAccount() {
+        locked = true;
+    }
+
+    public void resetLoginAttempts() {
+        loginAttempts = 0;
+    }
+
+    public boolean verifyPassword(String pwd) {
+        if (locked) {
+            System.out.println("\n\t\tAccount is locked due to too many failed login attempts.");
+            return false;
+        }
+        if (hashedPwd.equals(hashPassword(pwd))) {
+            resetLoginAttempts();
+            return true;
+        } else {
+            loginAttempts++;
+            System.out.println("\n\t\tIncorrect password. Attempt " + loginAttempts + " of 3.");
+            if (loginAttempts >= 3) {
+                lockAccount();
+                System.out.println("\n\t\tAccount locked due to too many failed attempts.");
+            }
+            return false;
+        }
+    }
+
+    public void changePassword(String newPwd) {
+        this.hashedPwd = hashPassword(newPwd);
+    }
+
+    public int getBalance() {
+        return balance;
+    }
+
+    public void deposit(int amount) {
+        balance += amount;
+        deposits.add(amount);
+    }
+
+    public boolean withdraw(int amount) {
+        if (amount > balance) {
+            System.out.println("\n\t\tInsufficient balance for withdrawal.");
+            return false;
+        }
+        balance -= amount;
+        withdrawals.add(amount);
+        return true;
+    }
+
+    public List<Integer> getDeposits() {
+        return deposits;
+    }
+
+    public List<Integer> getWithdrawals() {
+        return withdrawals;
+    }
+
+    private String hashPassword(String pwd) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hashedBytes = md.digest(pwd.getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashedBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not found.");
+        }
+    }
+}
+
+public class BankSimulator1 {
+    private static final Scanner sc = new Scanner(System.in);
+    private static final Map<String, User> users = new HashMap<>();
+    private static User currentUser = null;
+
+    public static void main(String[] args) {
+        // Preload some users
+        users.put("User1", new User("User1", "1111"));
+        users.put("User2", new User("User2", "2222"));
+        users.put("User3", new User("User3", "3333"));
+
+        while (true) {
+            if (currentUser == null) {
+                login();
+            } else {
+                showMenu();
+            }
+        }
+    }
+
+    private static String readMaskedPassword(String prompt) {
+        Console console = System.console();
+        if (console != null) {
+            char[] passwordChars = console.readPassword(prompt);
+            return new String(passwordChars);
+        } else {
+            System.out.print(prompt);
+            return sc.nextLine();
+        }
+    }
+
+
+    private static void login() {
+        System.out.println("\n\n\t\t********** Bank Simulator Login **********");
+        System.out.print("\n\t\tEnter username: ");
+        String username = sc.nextLine().trim();
+
+        if (!users.containsKey(username)) {
+            System.out.println("\n\t\tUser not found. Try again.");
+            return;
+        }
+
+        User user = users.get(username);
+
+        if (user.isLocked()) {
+            System.out.println("\n\t\tThis account is locked. Contact bank support.");
+            return;
+        }
+
+        String password = readMaskedPassword("\n\t\tPlease enter your password: ");
+
+        if (user.verifyPassword(password)){
+            currentUser = user;
+            System.out.println("\n\t\tWelcome, " + currentUser.getName() + "!");
+        }
+    }
+
+    private static void showMenu() {
+        System.out.println("\n\n\t\t********** ATM Menu **********");
+        System.out.println("\t\t1. Deposit");
+        System.out.println("\t\t2. Withdrawal");
+        System.out.println("\t\t3. Balance Inquiry");
+        System.out.println("\t\t4. Transaction History");
+        System.out.println("\t\t5. Change Password");
+        System.out.println("\t\t6. Logout");
+        System.out.print("\t\tEnter your choice: ");
+
+        String choice = sc.nextLine().trim();
+
+        switch (choice) {
+            case "1" -> deposit();
+            case "2" -> withdrawal();
+            case "3" -> showBalance();
+            case "4" -> showHistory();
+            case "5" -> changePassword();
+            case "6" -> logout();
+            default -> System.out.println("\n\t\tInvalid choice. Please enter valid number.");
+        }
+    }
+
+    private static void deposit() {
+        System.out.print("\n\t\tEnter deposit amount: ");
+        String input = sc.nextLine().trim();
+        int amount;
+        try {
+            amount = Integer.parseInt(input);
+            if (amount <= 0) {
+                System.out.println("\n\t\tDeposit amount must be positive.");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("\n\t\tInvalid amount entered.");
+            return;
+        }
+
+        if (currentUser.getDeposits().size() >= 10) {
+            System.out.println("\n\t\tToday's deposit limit reached.");
+            return;
+        }
+
+        currentUser.deposit(amount);
+        System.out.println("\n\t\tDeposit successful. New balance: " + currentUser.getBalance());
+    }
+
+    private static void withdrawal() {
+        System.out.print("\n\t\tEnter withdrawal amount: ");
+        String input = sc.nextLine().trim();
+        int amount;
+        try {
+            amount = Integer.parseInt(input);
+            if (amount <= 0) {
+                System.out.println("\n\t\tWithdrawal amount must be positive.");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("\n\t\tInvalid amount entered.");
+            return;
+        }
+
+        if (currentUser.getWithdrawals().size() >= 10) {
+            System.out.println("\n\t\tToday's withdrawal limit reached.");
+            return;
+        }
+
+        if (currentUser.withdraw(amount)) {
+            System.out.println("\n\t\tWithdrawal successful. New balance: " + currentUser.getBalance());
+        }
+    }
+
+    private static void showBalance() {
+        System.out.println("\n\t\tCurrent balance: " + currentUser.getBalance());
+    }
+
+    private static void showHistory() {
+        List<Integer> deposits = currentUser.getDeposits();
+        List<Integer> withdrawals = currentUser.getWithdrawals();
+
+        System.out.println("\n\t\tTransaction History");
+        System.out.println("\t\tDeposits\tWithdrawals");
+        int max = Math.max(deposits.size(), withdrawals.size());
+        for (int i = 0; i < max; i++) {
+            String dep = (i < deposits.size()) ? String.valueOf(deposits.get(i)) : "";
+            String wd = (i < withdrawals.size()) ? String.valueOf(withdrawals.get(i)) : "";
+            System.out.println("\t\t" + dep + "\t\t" + wd);
+        }
+    }
+
+    private static void changePassword() {
+        System.out.print("\n\t\tEnter current password: ");
+        String currentPwd = sc.nextLine();
+
+        if (!currentUser.verifyPassword(currentPwd)) {
+            return;
+        }
+
+        System.out.print("\t\tEnter new password: ");
+        String newPwd = sc.nextLine();
+
+        if (newPwd.trim().isEmpty()) {
+            System.out.println("\n\t\tPassword cannot be empty.");
+            return;
+        }
+
+        currentUser.changePassword(newPwd);
+        System.out.println("\n\t\tPassword changed successfully.");
+    }
+
+    private static void logout() {
+        System.out.println("\n\t\tLogging out. Thank you for using the Bank Simulator.");
+        currentUser = null;
+    }
+}
